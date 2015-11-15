@@ -15,11 +15,23 @@
 @property(nonatomic, strong) NSTextView *inputTextView;
 @property(nonatomic, strong) NSTextView *outputTextView;
 @property(nonatomic, strong) NSButton *allCopyButton;
+@property(strong, nonatomic) NSArray *linkPrefixs;
 
 @end
 
-
 @implementation ViewController
+
+
+- (NSArray *)linkPrefixs {
+    if (!_linkPrefixs) {
+        _linkPrefixs = @[
+                         @"ed2k://",
+                         @"ftp://",
+                         @"thunder://"
+                         ];
+    }
+    return _linkPrefixs;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -89,7 +101,7 @@
     outputScrollView.borderType = NSBezelBorder;
     [self.view addSubview:outputScrollView];
     [outputScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(outputScrollView.superview).offset(-20);
+//        make.bottom.equalTo(outputScrollView.superview).offset(-40);
         make.left.equalTo(outputScrollView.superview).offset(20);
         make.right.equalTo(outputScrollView.superview).offset(-20);
         make.top.equalTo(analyzeButton.mas_bottom).offset(20);
@@ -103,6 +115,21 @@
     _outputTextView.verticallyResizable = YES;
     _outputTextView.editable = YES;
     outputScrollView.documentView = _outputTextView;
+    
+    // 设置design
+    NSTextField *designLabel = [[NSTextField alloc] init];
+    designLabel.backgroundColor = [NSColor clearColor];
+    designLabel.bordered = NO;
+    designLabel.bezeled = NO;
+    designLabel.editable = NO;
+    designLabel.stringValue = @"Designed By TechSen";
+    [self.view addSubview:designLabel];
+    [designLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(outputScrollView.mas_bottom).offset(10);
+        make.bottom.equalTo(designLabel.superview).offset(-10);
+        make.right.equalTo(designLabel.superview).offset(-20);
+    }];
+    
 }
 
 
@@ -147,7 +174,8 @@
 
 
 - (void)allCopyButtonPressed:(NSButton *)sender {
-    
+    NSPasteboard *pastBoard = [NSPasteboard generalPasteboard];
+    [pastBoard clearContents];
 }
 
 - (void)getSourceCodeWithUrl:(NSString *)urlString success:(void(^)(NSString *sourceCode))success failure:(void(^)(NSError *error)) failure {
@@ -161,6 +189,9 @@
         if (responseString.length == 0) {
             responseString = [[NSString  alloc] initWithData:responseObject encoding:NSUTF8StringEncoding]; // UTF-8解码
         }
+        if (responseString.length == 0) {
+            responseString = [[NSString alloc] initWithData:responseObject encoding:NSUnicodeStringEncoding];
+        }
         success(responseString);
     } failure:^(AFHTTPRequestOperation * _Nullable operation, NSError * _Nonnull error) {
         failure(error);
@@ -170,31 +201,34 @@
 - (NSString *)analyzeFromString:(NSString *)string {
     NSMutableString *totalString = [NSMutableString string];
     NSScanner * scanner = [NSScanner scannerWithString:string];   // 创建扫描器
+    NSString *defaultPrefix = @"href=\"";
+    NSString *defualtSuffix = @"\">";
     while (true) {
         NSString * scannedString;
         while (true) {
+            BOOL flag = NO;
             NSString *keyString;
-            [scanner scanString:@"href=\"ed2k://" intoString:&keyString]; // 解析ed2k的链接
-            if (keyString) {
-                scanner.scanLocation -= 7;
-                break;
-            }else {
-                [scanner scanString:@"href=\"ftp://" intoString:&keyString]; // 解析ftp的链接
+            for (int i = 0; i < self.linkPrefixs.count; i++) {
+                [scanner scanString:[NSString stringWithFormat:@"%@%@",defaultPrefix,self.linkPrefixs[i]] intoString:&keyString]; // 遍历需要遍历的前缀
                 if (keyString) {
-                    scanner.scanLocation -= 6;
+                    NSInteger length = [self.linkPrefixs[i] length];
+                    scanner.scanLocation -= length;
+                    flag = YES;
                     break;
-                } else {
-                    scanner.scanLocation ++;
-                    if ([scanner isAtEnd]) {
-                        break;
-                    }
+                }
+            }
+            if (flag) break;
+            if (!keyString) { // 如果无对应前缀,直接句柄后移
+                scanner.scanLocation ++;
+                if ([scanner isAtEnd]) {
+                    break;
                 }
             }
         }
         if ([scanner isAtEnd]) {
             break;
         }
-        [scanner scanUpToString:@"\">" intoString:&scannedString];
+        [scanner scanUpToString:defualtSuffix intoString:&scannedString];
         [totalString appendString:[NSString stringWithFormat:@"%@\n",scannedString]];
     }
     return totalString;
