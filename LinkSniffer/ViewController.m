@@ -16,6 +16,7 @@
 @property(nonatomic, strong) NSTextView *outputTextView;
 @property(nonatomic, strong) NSButton *allCopyButton;
 @property(strong, nonatomic) NSArray *linkPrefixs;
+@property(nonatomic, copy) NSString *outputString;
 
 @end
 
@@ -146,7 +147,8 @@
             [self getSourceCodeWithUrl:prepareScanString success:^(NSString *sourceCode) {
                 NSString *analyzedString = [self analyzeFromString:sourceCode];
                 if (analyzedString.length > 0) {
-                    _outputTextView.string = [self analyzeFromString:sourceCode];
+                    _outputString = [self analyzeFromString:sourceCode];
+                    _outputTextView.string = _outputString;
                     _allCopyButton.enabled = YES;
                 } else {
                     _outputTextView.string = @"未闻到下载链接的味道(⊙_⊙)";
@@ -176,6 +178,8 @@
 - (void)allCopyButtonPressed:(NSButton *)sender {
     NSPasteboard *pastBoard = [NSPasteboard generalPasteboard];
     [pastBoard clearContents];
+    [pastBoard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pastBoard setString:_outputString forType:NSStringPboardType];
 }
 
 - (void)getSourceCodeWithUrl:(NSString *)urlString success:(void(^)(NSString *sourceCode))success failure:(void(^)(NSError *error)) failure {
@@ -240,6 +244,8 @@
     NSPredicate *pred = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", regex];
     return [pred evaluateWithObject:urlString];
 }
+
+
 
 
 @end
